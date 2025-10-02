@@ -1,53 +1,43 @@
-# src/data_preprocessing.py
-
 import pandas as pd
 import re
 import pickle
-from sklearn.model_selection import train_test_split
+import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-# -------------------------
-# File paths
-DATA_PATH = "data/raw/train.csv"
-PROCESSED_PATH = "data/processed/"
-# -------------------------
+# Paths
+RAW_PATH = r"C:\Users\P.R\FakeNewsDetection\data\raw\train.csv"
+PROCESSED_PATH = r"C:\Users\P.R\FakeNewsDetection\data\processed\processed_data.csv"
+VECTORIZER_PATH = r"C:\Users\P.R\FakeNewsDetection\models\tfidf_vectorizer.pkl"
 
 # Load dataset
-df = pd.read_csv(DATA_PATH)
+df = pd.read_csv(RAW_PATH)
 print("Dataset shape:", df.shape)
 print("Columns:", df.columns)
 
-# -------------------------
-# Text preprocessing
-def preprocess_text(text):
-    text = text.lower()
-    text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"[^a-zA-Z]", " ", text)
-    text = text.strip()
-    return text
+# Text cleaning function
+def clean_text(text):
+    if pd.isnull(text):
+        return ""
+    text = re.sub(r"http\S+", "", text)  # remove URLs
+    text = re.sub(r"[^a-zA-Z]", " ", text)  # keep only letters
+    text = re.sub(r"\s+", " ", text)  # remove extra spaces
+    return text.lower().strip()
 
-df['text'] = df['text'].apply(preprocess_text)
-df['title'] = df['title'].apply(preprocess_text)
+# Apply cleaning
+df["clean_text"] = df["text"].apply(clean_text)
 
+# Save processed data
+os.makedirs(os.path.dirname(PROCESSED_PATH), exist_ok=True)
+df.to_csv(PROCESSED_PATH, index=False)
 print("Preprocessing done ✅")
 
-# -------------------------
-# Train-test split
-X = df['text']
-y = df['label']
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
-)
-
-# -------------------------
-# TF-IDF vectorization
-vectorizer = TfidfVectorizer(max_features=5000, stop_words='english')
-X_train_tfidf = vectorizer.fit_transform(X_train)
-X_test_tfidf = vectorizer.transform(X_test)
+# TF-IDF Vectorizer
+vectorizer = TfidfVectorizer(stop_words="english", max_features=5000)
+vectorizer.fit(df["clean_text"])
 
 # Save vectorizer
-with open(PROCESSED_PATH + "tfidf_vectorizer.pkl", "wb") as f:
+os.makedirs(os.path.dirname(VECTORIZER_PATH), exist_ok=True)
+with open(VECTORIZER_PATH, "wb") as f:
     pickle.dump(vectorizer, f)
 
 print("Vectorizer saved ✅")

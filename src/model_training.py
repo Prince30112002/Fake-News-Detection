@@ -1,46 +1,59 @@
-import os
+import pandas as pd
 import pickle
+import os
+from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression, PassiveAggressiveClassifier
-from sklearn.metrics import accuracy_score, classification_report
-from data_preprocessing import load_data, preprocess_data
+from sklearn.metrics import classification_report, accuracy_score
 
-# Base directory set
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_DIR = os.path.join(BASE_DIR, "..", "models")
-os.makedirs(MODEL_DIR, exist_ok=True)
+# Paths
+PROCESSED_PATH = r"C:\Users\P.R\FakeNewsDetection\data\processed\processed_data.csv"
+VECTORIZER_PATH = r"C:\Users\P.R\FakeNewsDetection\models\tfidf_vectorizer.pkl"
+MODELS_DIR = r"C:\Users\P.R\FakeNewsDetection\models"
 
-def train_and_save_models():
-    # Data load + preprocess
-    df = load_data()
-    X_train, X_test, y_train, y_test, vectorizer = preprocess_data(df)
+print("Loading processed data...")
+df = pd.read_csv(PROCESSED_PATH)
 
-    # Logistic Regression
-    log_reg = LogisticRegression(max_iter=1000)
-    log_reg.fit(X_train, y_train)
-    y_pred_lr = log_reg.predict(X_test)
-    print("Logistic Regression Accuracy:", accuracy_score(y_test, y_pred_lr))
-    print(classification_report(y_test, y_pred_lr))
+print("Dataset shape:", df.shape)
+print("Columns:", df.columns)
 
-    # Passive Aggressive Classifier
-    pac = PassiveAggressiveClassifier(max_iter=1000)
-    pac.fit(X_train, y_train)
-    y_pred_pac = pac.predict(X_test)
-    print("Passive Aggressive Classifier Accuracy:", accuracy_score(y_test, y_pred_pac))
-    print(classification_report(y_test, y_pred_pac))
+# Fix NaN values
+df["clean_text"] = df["clean_text"].fillna("")
 
-    # Save models
-    with open(os.path.join(MODEL_DIR, "log_reg_model.pkl"), "wb") as f:
-        pickle.dump(log_reg, f)
+X = df["clean_text"]
+y = df["label"]
 
-    with open(os.path.join(MODEL_DIR, "pac_model.pkl"), "wb") as f:
-        pickle.dump(pac, f)
+# Load TF-IDF vectorizer
+with open(VECTORIZER_PATH, "rb") as f:
+    vectorizer = pickle.load(f)
 
-    # Save vectorizer
-    with open(os.path.join(MODEL_DIR, "vectorizer.pkl"), "wb") as f:
-        pickle.dump(vectorizer, f)
+X_vec = vectorizer.transform(X)
 
-    print("✅ Models and vectorizer saved successfully in 'models/' folder!")
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X_vec, y, test_size=0.2, random_state=42
+)
 
+# Logistic Regression
+log_reg = LogisticRegression(max_iter=1000)
+log_reg.fit(X_train, y_train)
+y_pred_lr = log_reg.predict(X_test)
+print("\nLogistic Regression Accuracy:", accuracy_score(y_test, y_pred_lr))
+print(classification_report(y_test, y_pred_lr))
 
-if __name__ == "__main__":
-    train_and_save_models()
+# Passive Aggressive Classifier
+pac = PassiveAggressiveClassifier(max_iter=1000, random_state=42)
+pac.fit(X_train, y_train)
+y_pred_pac = pac.predict(X_test)
+print("\nPassive Aggressive Classifier Accuracy:", accuracy_score(y_test, y_pred_pac))
+print(classification_report(y_test, y_pred_pac))
+
+# Save models
+os.makedirs(MODELS_DIR, exist_ok=True)
+
+with open(os.path.join(MODELS_DIR, "logistic_regression.pkl"), "wb") as f:
+    pickle.dump(log_reg, f)
+
+with open(os.path.join(MODELS_DIR, "passive_aggressive.pkl"), "wb") as f:
+    pickle.dump(pac, f)
+
+print("\n✅ Models and vectorizer saved successfully in 'models/' folder!")
